@@ -1,4 +1,4 @@
-%%
+%% Edit
 % Mario Malic, July 2020
 % Contact mail: mario@mariomalic.com
 % Alternative contact mail: mario.malic@gmail.com
