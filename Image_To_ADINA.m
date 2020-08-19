@@ -1,5 +1,5 @@
 %%
-% Mario Malic, July 2020
+% Mario Malic, August 2020
 % Contact mail: mario@mariomalic.com
 % Alternative contact mail: mario.malic@gmail.com
 %
@@ -7,106 +7,97 @@
 % - Function 'rgb2hex' written by Chad A. Greene, sourced from
 %   MATLAB File Exchange
 %% Recommendations:
-% There are few options to reduce the time building the model
+% There are few options to reduce the time to build the model in addition
+% to environment control settings:
 % - Edit - Memory Usage and give ADINA-AUI extra RAM to work with.
-% - File - and click Stop Recording if it is turned on
+% - File -  Stop Recording if it is turned on
 % - Hide message window on the bottom of AUI window
-% On my machine 161 x 240 image takes 10 minutes, 402 x 600 takes an hour
-% 515 x 768 six hours
-% ADINA will most likely freeze (not respond) during the model buildup, have patience.
+% 
+% - On my machine 161 x 240 image takes 7 minutes, 402 x 600 takes an hour
+%   515 x 768 six hours.
+% - ADINA will most likely freeze (not respond) during the model buildup,
+%   have patience.
+% - For the larger band tables 5MB+, it is faster to copy and paste rather to
+%   import it
 %% Issues:
-% - RGB colors are not well represented.
+% - 
 %% Possible solutions:
-% - Check if RGB_Array, Deformation_Array have been correctly assigned/calculated
-% - Investigate Band_Plot capabilities
+% - 
+%% Running the model
+% - Download rgb2hex.m from MATLAB File Exchange
+% - Put ImageToADINA.m, rgb2hex.m and desired image in the same folder
+% - Run the code
+% - Choose the image you would like to create in ADINA when prompted
+% - Output is the ADINA model input file (.in) and custom band table (.txt)
+% - Import the input file and solve it
 %% Postprocessing the model
-% - This script outputs Bandtable_Unique.txt file that contains the values
-%   custom for table of strain values and corresponding RGB values in HEX format.
-% - If you use the Type: Automatic band plot, Min/Max color is the first
-%   and last HEX value in the mentioned text file or from variables R_Min,
-%   G_Min, B_Min, R_Max, G_Max, B_Max 
-% - One can use black and white as Min/Max values for a grayscale image, looks great
-%%
+% - Import Band_File_Name.txt as custom band table for strain values
+% - If you use the Automatic band plot type, you can use black and 
+%   white as Min/Max values to get a grayscale image
+%% Preparation
 clearvars;
 clc;
 fclose all;
 format long
-%% Obtaining data for the image
-% Image path (Next 2 lines need adjustment)
-Working_Dir = 'C:\Users\Mario\Desktop\ADINA\Last_Test\'; % Folder where the image is located in, including the last character '\'
-File_Name = 'Mona_Lisa_Smallest'; % Image name
-cd (Working_Dir);
-Image_Data = imread (File_Name, 'jpg'); % Works only with .jpg format
+fprintf('Beginning to run %s.m ...\n\n', mfilename);
+%% Obtaining data from the image
+% Prompt for image file
+[File_Name,Working_Dir] = uigetfile({'*.jpg','*.*'}, 'File Selector');
+File_Name = File_Name(1:end-4); % Removing file format from char array
+% Working_Dir = 'C:\...\'; % Folder where the image is located in, including the last character '\'
+% File_Name = 'Example_Image'; % Image name
+addpath (Working_Dir);
+Image_Data = imread(File_Name, 'jpg'); % Tested only with .jpg format
 
 % RGB Channels
-Red_Channel = single(Image_Data(:, :, 1));
-Green_Channel = single(Image_Data(:, :, 2));
-Blue_Channel = single(Image_Data(:, :, 3));
+Red_Channel = double(Image_Data(:, :, 1));
+Green_Channel = double(Image_Data(:, :, 2));
+Blue_Channel = double(Image_Data(:, :, 3));
 
-% Horizontal and vertical pixels
+% Horizontal and vertical pixels value
 [V_Pixels, H_Pixels, ~] = size(Image_Data);
+Num_Points = H_Pixels * V_Pixels; 
 
-% Contains pixel data as a single value
-RGB_Array =double(65536 * Red_Channel + 256 * Green_Channel + Blue_Channel);
+% Contains pixel data as a number
+RGB_Array = 65536 * Red_Channel + 256 * Green_Channel + Blue_Channel;
 
-% Finding color with lowest and highest RGB value
+% Calculate needed deformations for each pixel
+Deformation_Array = (reshape(linspace(1e-6, 1, Num_Points), H_Pixels, V_Pixels))';
+
+% Finding values of lowest and highest RGB values
 Min_RGB = min(min(RGB_Array));
 [X_Min, Y_Min] = find(RGB_Array == Min_RGB);
 Max_RGB = max(max(RGB_Array));
 [X_Max, Y_Max] = find(RGB_Array == Max_RGB);
 
-% Finding minimum and maximum RGB values
-% These values are the input for the minimum and maximum color for the band plot
-R_Min = Red_Channel(X_Min, Y_Min)
-G_Min = Green_Channel(X_Min, Y_Min)
-B_Min = Blue_Channel(X_Min, Y_Min)
-R_Max = Red_Channel(X_Max, Y_Max)
-G_Max = Green_Channel(X_Max, Y_Max)
-B_Max = Blue_Channel(X_Max, Y_Max)
-
-% Calculate needed deformations for each pixel
-Deformation_Array = rescale(RGB_Array, 1e-6, 1);
-
-% Obtaining values for custom band table
-Values = cell(V_Pixels, H_Pixels);
-Colors = cell(V_Pixels, H_Pixels);
-Counter = 1;
-Band_Table = cell(V_Pixels*H_Pixels, 2);
-
-for ii = 1 : 1 : V_Pixels
-    for jj = 1 : 1 : H_Pixels 
-        Values {ii, jj} = Deformation_Array(ii,jj);
-        Colors {ii, jj} = rgb2hex([Red_Channel(ii,jj) Green_Channel(ii,jj) Blue_Channel(ii,jj)]);
-        Band_Table {Counter, 1} = sprintf('%.16f\t', Values {ii, jj});
-        Band_Table {Counter, 2} = sprintf('%s', Colors {ii, jj});
-        Counter = Counter + 1;
-    end
+% For images with multiple max and min RGB values, get first value (R2020+)
+if any([isscalar(X_Min) isscalar(X_Max) isscalar(Y_Min) isscalar(Y_Max)]>0,'all') 
+X_Min = X_Min(1); X_Max = X_Max(1); Y_Min = Y_Min(1); Y_Max = Y_Max(1); % For colors with multiple max/min values, choose first(any) one
 end
+% For older MATLAB versions replace if condition by the following line
+% X_Min = X_Min(1); X_Max = X_Max(1); Y_Min = Y_Min(1); Y_Max = Y_Max(1)
 
-Band_Table_New = Band_Table';
-Band_Table_1 = Band_Table_New(1,:);
-Band_Table_2 = Band_Table_New(2,:);
-Band_Table_New= strcat(Band_Table_1, Band_Table_2);
+% % % Finding minimum and maximum RGB values
+% % R_Min = Red_Channel(X_Min, Y_Min);
+% % G_Min = Green_Channel(X_Min, Y_Min);
+% % B_Min = Blue_Channel(X_Min, Y_Min);
+% % R_Max = Red_Channel(X_Max, Y_Max);
+% % G_Max = Green_Channel(X_Max, Y_Max);
+% % B_Max = Blue_Channel(X_Max, Y_Max);
+% % 
+% % disp(['Minimum RGB values are [' num2str([R_Min G_Min B_Min]), ']', ' -> Hex ', rgb2hex([R_Min G_Min B_Min])])
+% % disp(' ')
+% % disp(['Maximum RGB values are [' num2str([R_Max G_Max B_Max]), ']', ' -> Hex ', rgb2hex([R_Max G_Max B_Max])])
+% % disp(' ')
 
-Band_Table = (sort(Band_Table))';
-Band_Table_Unique_1 = unique(Band_Table(1,:));
-Band_Table_Unique_2 = unique(Band_Table(2,:));
-Band_Table_Unique = strcat(Band_Table_Unique_1, Band_Table_Unique_2);
-
-% Writing custom band table
-fid = fopen('Bandtable.txt','w');
-fprintf(fid,'%s\n', Band_Table_New{:});
-fclose(fid);
-
-% Writing custom band table for direct import
-fid = fopen('Bandtable_Unique.txt','w');
-fprintf(fid,'%s\n', Band_Table_Unique{:});
-fclose(fid);
-%% Writing input file for ADINA
-
-DX = 1e-4; % Distance between horizontal pixels
-DY = 1e-4; % Distance between vertical pixels
-Num_Points = H_Pixels * V_Pixels; 
+% Reshaping arrays as an input to hex2rgb function
+Red_Channel_R = reshape(Red_Channel', H_Pixels*V_Pixels, 1);
+Green_Channel_R = reshape(Green_Channel', H_Pixels*V_Pixels, 1);
+Blue_Channel_R = reshape(Blue_Channel', H_Pixels*V_Pixels, 1);
+Hex_Colors = cellstr(rgb2hex([Red_Channel_R(:) Green_Channel_R(:) Blue_Channel_R(:)]));
+%% Defining coordinates for points
+DX = 1e-3; % Distance between horizontal pixels
+DY = 1e-3; % Distance between vertical pixels
 CS_Array = zeros(V_Pixels, H_Pixels); % Coordinate system for points input
 
 X_Coords_Array = zeros(V_Pixels, H_Pixels);
@@ -119,18 +110,22 @@ end
 Y_Coords_Array = zeros(V_Pixels, H_Pixels);
 for ii = 1 : 1 : V_Pixels
     for jj = 1 : 1 : H_Pixels   
-      Y_Coords_Array(ii,jj) = (-1)*DY*(ii-1); % Function "imread" reads pixels in a different orientation, hence the first (-1)
+      Y_Coords_Array(ii,jj) =  (-1)*DY*(ii-1); % Function "imread" reads pixels in a different orientation, hence the first (-1)
     end
 end
 
 Z_Coords_Array_0 = ones(V_Pixels, H_Pixels)*(-1);
 Z_Coords_Array_1 = ones(V_Pixels, H_Pixels) - Deformation_Array;
 
-%% Writing to file
-
+% Calculating strain values as an input to band table
+Band_Values = Deformation_Array./(abs(Z_Coords_Array_1 - Z_Coords_Array_0));
+Band_Values = reshape(Band_Values', numel(Band_Values), 1);
+%% Writing an input file for AUI
 % Changing environment settings to speed up the model build up
 Index = 1;
-File{Index} = sprintf('CONTROL PLOTUNIT=PERCENT VERBOSE=YES ERRORLIM=0 LOGLIMIT=0 UNDO=-1 PROMPTDE=UNKNOWN AUTOREPA=NO DRAWMATT=NO DRAWTEXT=EXACT DRAWLINE=EXACT DRAWFILL=EXACT AUTOMREB=NO ZONECOPY=NO SWEEPCOI=YES SESSIONS=NO DYNAMICT=YES UPDATETH=YES AUTOREGE=NO ERRORACT=CONTINUE FILEVERS=CURRENT INITFCHE=NO SIGDIGIT=12 AUTOZONE=NO PSFILEVE=V0 ELEMENT-=REPEAT SESSIONO=ALL SESSIONT=100 SZNAME=TOPDOWN DUPLICAT=NO');
+File{Index} = sprintf('HEADING STRING=''ImageToADINA by Mario Malic''');
+Index = Index + 1; File{Index} = sprintf('*');
+Index = Index + 1; File{Index} = sprintf('CONTROL PLOTUNIT=PERCENT VERBOSE=YES ERRORLIM=0 LOGLIMIT=0 UNDO=-1 PROMPTDE=UNKNOWN AUTOREPA=NO DRAWMATT=NO DRAWTEXT=EXACT DRAWLINE=EXACT DRAWFILL=EXACT AUTOMREB=NO ZONECOPY=NO SWEEPCOI=YES SESSIONS=NO DYNAMICT=YES UPDATETH=YES AUTOREGE=NO ERRORACT=CONTINUE FILEVERS=CURRENT INITFCHE=NO SIGDIGIT=12 AUTOZONE=NO PSFILEVE=V0 ELEMENT-=REPEAT SESSIONO=ALL SESSIONT=100 SZNAME=TOPDOWN DUPLICAT=NO');
 Index = Index + 1; File{Index} = sprintf('*');
 
 % Coordinate system header
@@ -177,10 +172,8 @@ end
 Index = Index + 1; File{Index} = sprintf('@');
 Index = Index + 1; File{Index} = sprintf('*');
 
-
 % Defining load (displacement)
 Load_Array = Deformation_Array;
-
 Load_Index = 0;
 for ii = 1 : 1 : V_Pixels
     for jj = 1 : 1 : H_Pixels
@@ -205,7 +198,7 @@ Index = Index + 1; File{Index} = sprintf('@');
 Index = Index + 1; File{Index} = sprintf('*');
 
 % Defining material model
-Index = Index + 1; File{Index} = sprintf('MATERIAL ELASTIC NAME=1 E=2.10000000000000E+11 NU=0.300000000000000 DENSITY=0.00000000000000 ALPHA=0.00000000000000 MDESCRIP=''NONE''');
+Index = Index + 1; File{Index} = sprintf('MATERIAL ELASTIC NAME=1 E=2.10000000000000E+11 NU=0.000000000000000 DENSITY=0.00000000000000 ALPHA=0.00000000000000 MDESCRIP=''NONE''');
 Index = Index + 1; File{Index} = sprintf('*');
 
 % % Defining cross section
@@ -238,6 +231,9 @@ Index = Index + 1; File{Index} = sprintf('*');
 % Index = Index + 1; File{Index} = sprintf('DATABASE SAVE PERMFILE=''%s%s.idb'' PROMPT=NO', Working_Dir, File_Name);
 % Index = Index + 1; File{Index} = sprintf('*');
 
+Index = Index + 1; File{Index} = sprintf('ADINA OPTIMIZE=SOLVER FILE=''%s%s.dat'' FIXBOUND=YES OVERWRIT=YES', Working_Dir, File_Name);
+Index = Index + 1; File{Index} = sprintf('*');
+
 % Exporting file in .NAS format 
 Index = Index + 1; File{Index} = sprintf('EXPORT NASTRAN FILE=''%s%s.nas'' OVERWRIT=YES FORMAT=SMALL', Working_Dir, File_Name);
 Index = Index + 1; File{Index} = sprintf('*');
@@ -250,3 +246,11 @@ for p = 1:numel(File)
 end
 fclose(FID);
 
+% Saving custom band file
+Band_Table_File = sprintf('Band_%s.txt', File_Name);
+FID = fopen(Band_Table_File,'wt'); % Saves .txt file
+for p = 1:1:length(Hex_Colors)
+    fprintf(FID, '%.16f\t%s\n', Band_Values(p), Hex_Colors{p});
+end
+fclose(FID);
+disp('Task finished');
