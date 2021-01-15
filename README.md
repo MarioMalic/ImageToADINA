@@ -8,8 +8,7 @@ Alternative contact mail: mario.malic@gmail.com
 
 #### Credits:
 - Function 'rgb2hex' written by Chad A. Greene, sourced from MATLAB File Exchange
-##### Recommendations:
-- There are few options to reduce the time to build the model in addition to environment control settings:  
+##### There are few options to reduce the time to build the model in addition to environment control settings:  
 - Edit - Memory Usage and give ADINA-AUI extra RAM to work with.  
 - File - Stop Recording if it is turned on
 - Hide message window on the bottom of AUI window
