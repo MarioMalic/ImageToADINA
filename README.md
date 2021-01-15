@@ -25,4 +25,5 @@ Alternative contact mail: mario.malic@gmail.com
 - Output is the ADINA model input file (.in) and custom band table (.txt)
 - Import the input file and solve it
 #### Postprocessing the model
+- Load the porthole file and create a band plot of axial strain values
 - Import Band_File_Name.txt as custom band table for strain values
